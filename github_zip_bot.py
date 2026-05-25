@@ -192,12 +192,8 @@ async def upload_tree_to_github(
 # ══════════════════════════════════════════════════════════════════════════════
 #  البوت
 # ══════════════════════════════════════════════════════════════════════════════
-app = Client(
-    "github_zip_bot",
-    api_id=Config.API_ID,
-    api_hash=Config.API_HASH,
-    bot_token=Config.BOT_TOKEN,
-)
+# يتم إنشاء app في __main__ بعد تحميل .env
+app = Client("github_zip_bot", api_id=0, api_hash="x", bot_token="x")
 
 
 # ─── /start ──────────────────────────────────────────────────────────────────
@@ -597,24 +593,87 @@ async def on_document(client: Client, msg: Message):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  إنشاء .env تلقائياً عند أول تشغيل
+# ══════════════════════════════════════════════════════════════════════════════
+def setup_env():
+    """يطلب البيانات من المستخدم ويحفظها في .env تلقائياً"""
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+
+    # إذا كان .env موجوداً بالفعل، لا نسأل مجدداً
+    if os.path.exists(env_path):
+        return
+
+    print("═" * 50)
+    print("🔧 إعداد أول مرة — سيتم حفظ البيانات في .env")
+    print("═" * 50)
+
+    print("\n📌 احصل على API_ID و API_HASH من:")
+    print("   https://my.telegram.org/apps\n")
+    api_id   = input("   API_ID   : ").strip()
+    api_hash = input("   API_HASH : ").strip()
+
+    print("\n📌 احصل على BOT_TOKEN من @BotFather\n")
+    bot_token = input("   BOT_TOKEN : ").strip()
+
+    print("\n📌 GitHub Token (اختياري — اضغط Enter لتخطي)\n")
+    github_token = input("   GITHUB_TOKEN : ").strip()
+
+    # حفظ الملف
+    lines = [
+        f"API_ID={api_id}\n",
+        f"API_HASH={api_hash}\n",
+        f"BOT_TOKEN={bot_token}\n",
+    ]
+    if github_token:
+        lines.append(f"GITHUB_TOKEN={github_token}\n")
+
+    with open(env_path, "w") as f:
+        f.writelines(lines)
+
+    print("\n✅ تم حفظ الإعدادات في .env")
+    print("═" * 50)
+
+    # أعد تحميل المتغيرات فوراً
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(env_path, override=True)
+        # حدّث Config
+        Config.API_ID     = int(os.getenv("API_ID", "0"))
+        Config.API_HASH   = os.getenv("API_HASH", "")
+        Config.BOT_TOKEN  = os.getenv("BOT_TOKEN", "")
+        Config.GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+    except ImportError:
+        pass
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  نقطة الدخول
 # ══════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
+    # إعداد .env إذا لم يكن موجوداً
+    setup_env()
+
+    # إعادة تهيئة Client بعد تحميل البيانات
+    app = Client(
+        "github_zip_bot",
+        api_id=Config.API_ID,
+        api_hash=Config.API_HASH,
+        bot_token=Config.BOT_TOKEN,
+    )
+
     errors = Config.validate()
     if errors:
         print("═" * 50)
-        print("⚠️  يجب ضبط المتغيرات التالية:")
+        print("⚠️  بيانات غير صحيحة:")
         for e in errors:
             print(f"   • {e}")
-        print("\nعدّل قسم Config في الكود أو استخدم متغيرات البيئة:")
-        print("   BOT_TOKEN=xxx API_ID=yyy API_HASH=zzz python github_zip_bot.py")
+        print("\nاحذف ملف .env وشغّل البوت مجدداً")
         print("═" * 50)
         raise SystemExit(1)
 
     print("═" * 50)
     print("🤖 GitHub ZIP Bot يعمل...")
     print(f"   الحجم الأقصى: {Config.MAX_FILE_MB} MB")
-    print(f"   مجلد مؤقت: {Config.TEMP_DIR}")
     print("═" * 50)
 
     app.run()
